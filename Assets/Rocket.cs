@@ -2,15 +2,27 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class Rocket : MonoBehaviour {
 
-    Rigidbody rigidBody;
     AudioSource fart;
+    Rigidbody rigidBody;
+
+    [SerializeField] AudioClip mainEngine;
+    [SerializeField] AudioClip deathSound;
+    [SerializeField] AudioClip nextLevelSound;
+
+    [SerializeField] ParticleSystem thrusterFlame;
+    [SerializeField] ParticleSystem crash;
+    [SerializeField] ParticleSystem last;
+
     [SerializeField] float rcsThrust = 100f;
     [SerializeField] float mainThrust = 100f;
 
-
+    enum State { Dying, LevelUp, Alive }
+    State state = State.Alive;
+    
     void Start()
     {
         //Init Unity Components
@@ -20,25 +32,65 @@ public class Rocket : MonoBehaviour {
 
     // Update is called once per frame
     void Update () {
-        Thrust();
-        Rotate();
+        if(state == State.Alive)
+        {
+            Thrust();
+            Rotate();
+        }
 	}
 
     void OnCollisionEnter(Collision collision)
     {
+        if(state != State.Alive)
+        {
+            return;
+        }
+
         switch (collision.gameObject.tag)
         {
             case "Launch":
                 //Start
-                print("Begin");
                 break;
             case "Land":
                 //Win
+                last.Play();
+                state = State.LevelUp;
+                PlayCollisionSound();
+                Invoke("LoadScene", 1f);
                 break;
             default:
                 //Loss
+                crash.Play();
+                state = State.Dying;
+                PlayCollisionSound();
+                Invoke("LoadFirstLevel", 1f);
                 break;
         }
+    }
+
+    private void PlayCollisionSound()
+    {
+        fart.Stop();
+        fart.pitch = 1f;
+        if (state == State.LevelUp)
+        {
+            fart.PlayOneShot(nextLevelSound);
+        }
+        else
+        {
+            fart.PlayOneShot(deathSound);
+        }
+    }
+
+    private void LoadScene()
+    {
+        //Fixme: Add more levels
+        SceneManager.LoadScene(1);
+    }
+
+    private void LoadFirstLevel()
+    {
+        SceneManager.LoadScene(0);
     }
 
     private void Rotate()
@@ -65,18 +117,27 @@ public class Rocket : MonoBehaviour {
         float thrustThisFrame = mainThrust * Time.deltaTime;
         if (Input.GetKey(KeyCode.Space))
         {
-            //If sound is already playing don't layer sounds
-            if (!fart.isPlaying)
-            {
-                fart.Play();
-            }
+            ThrustSound();
+            thrusterFlame.Play();
             //Thrust
             rigidBody.AddRelativeForce(Vector3.up * thrustThisFrame);
         }
-        else
+        else if (state == State.Alive)
         {
-            //Stop sound effect when not depressed
             fart.Stop();
+            thrusterFlame.Stop();
+        }
+    }
+
+    private void ThrustSound()
+    {
+        // wet farts
+        // fart.pitch = UnityEngine.Random.Range(0.32f, 1.23f);
+        //If sound is already playing don't layer sounds
+        if (!fart.isPlaying)
+        {
+            fart.pitch = UnityEngine.Random.Range(0.32f, 1.23f);
+            fart.PlayOneShot(mainEngine);
         }
     }
 }
